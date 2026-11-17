@@ -1,0 +1,8 @@
+.build/
+.packages/
+**/bin/
+**/obj/
+dist/
+test-results/
+.vs/
+*.user

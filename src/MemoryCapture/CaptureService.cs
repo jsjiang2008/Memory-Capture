@@ -1,0 +1,196 @@
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
+using System.Text;
+using Forms = System.Windows.Forms;
+using Drawing = System.Drawing;
+
+namespace MemoryCapture;
+
+public enum CaptureMode { Region, Window, Display }
+
+public static class CaptureService
+{
+    public static Drawing.Bitmap CaptureDesktopSnapshot(Drawing.Rectangle bounds)
+    {
+        if (bounds.Width <= 0 || bounds.Height <= 0 || (long)bounds.Width * bounds.Height * 4 > 256L * 1024 * 1024)
+            throw new InvalidOperationException("The combined displays exceed the capture memory limit.");
+        var bitmap = new Drawing.Bitmap(bounds.Width, bounds.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        try
+        {
+            using var graphics = Drawing.Graphics.FromImage(bitmap);
+            graphics.CopyFromScreen(bounds.Location, Drawing.Point.Empty, bounds.Size, CopyPixelOperation.SourceCopy);
+            return bitmap;
+        }
+        catch { bitmap.Dispose(); throw; }
+    }
+    public static async Task<BitmapSource?> CaptureAsync(CaptureMode mode)
+    {
+        using var picker = new CaptureOverlay(mode);
+        if (picker.ShowDialog() != Forms.DialogResult.OK) return null;
+        if (mode == CaptureMode.Window)
+        {
+            await Task.Delay(120);
+            return await WindowCapture.CaptureAsync(picker.SelectedWindow);
+        }
+        return picker.Result;
+    }
+
+    public static BitmapSource FromDrawingBitmap(Drawing.Bitmap bitmap)
+    {
+        var area = new Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height);
+        var data = bitmap.LockBits(area, ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        try
+        {
+            var pixels = new byte[checked(bitmap.Width * bitmap.Height * 4)];
+            for (int y = 0; y < bitmap.Height; y++)
+                Marshal.Copy(data.Scan0 + y * data.Stride, pixels, y * bitmap.Width * 4, bitmap.Width * 4);
+            // GDI screen pixels have an undefined alpha channel.
+            for (int i = 3; i < pixels.Length; i += 4) pixels[i] = 255;
+            var image = BitmapSource.Create(bitmap.Width, bitmap.Height, 96, 96, PixelFormats.Bgra32, null, pixels, bitmap.Width * 4);
+            image.Freeze();
+            return image;
+        }
+        finally { bitmap.UnlockBits(data); }
+    }
+}
+
+internal sealed class CaptureOverlay : Forms.Form
+{
+    private readonly CaptureMode _mode;
+    private readonly Drawing.Rectangle _desktop;
+    private readonly Drawing.Bitmap _snapshot;
+    private readonly List<(nint Handle, Drawing.Rectangle Bounds)> _windows = [];
+    private Drawing.Rectangle _selection;
+    private Drawing.Point _anchor;
+    private bool _dragging;
+    public BitmapSource? Result { get; private set; }
+    public nint SelectedWindow { get; private set; }
+
+    public CaptureOverlay(CaptureMode mode)
+    {
+        _mode = mode;
+        _desktop = Forms.SystemInformation.VirtualScreen;
+        if ((long)_desktop.Width * _desktop.Height * 4 > 256L * 1024 * 1024)
+            throw new InvalidOperationException("The combined displays exceed the capture memory limit.");
+        if (mode == CaptureMode.Window)
+        {
+            Native.EnumWindows((handle, _) =>
+            {
+                if (!Native.IsWindowVisible(handle) || Native.IsIconic(handle) || Native.GetWindowTextLength(handle) == 0) return true;
+                Native.DwmGetWindowAttribute(handle, 14, out int cloaked, sizeof(int));
+                if (cloaked != 0) return true;
+                Native.GetWindowThreadProcessId(handle, out uint process);
+                if (process == Environment.ProcessId) return true;
+                if (Native.DwmGetWindowAttribute(handle, 9, out Native.Rect rect, Marshal.SizeOf<Native.Rect>()) != 0)
+                    Native.GetWindowRect(handle, out rect);
+                var bounds = Drawing.Rectangle.FromLTRB(rect.Left, rect.Top, rect.Right, rect.Bottom);
+                if (bounds.Width > 0 && bounds.Height > 0) _windows.Add((handle, bounds));
+                return true;
+            }, 0);
+        }
+        _snapshot = CaptureService.CaptureDesktopSnapshot(_desktop);
+        FormBorderStyle = Forms.FormBorderStyle.None;
+        StartPosition = Forms.FormStartPosition.Manual;
+        AutoScaleMode = Forms.AutoScaleMode.None;
+        Bounds = _desktop;
+        TopMost = true;
+        ShowInTaskbar = false;
+        DoubleBuffered = true;
+        KeyPreview = true;
+        Cursor = Forms.Cursors.Cross;
+        Text = "Memory Capture selection";
+    }
+
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        // Set physical bounds after the HWND is created, avoiding WPF device-independent units.
+        Native.SetWindowPos(Handle, new nint(-1), _desktop.X, _desktop.Y, _desktop.Width, _desktop.Height, 0x0040);
+        Activate();
+        UpdateSelection();
+    }
+    private Drawing.Point Pointer => new(Forms.Cursor.Position.X - _desktop.X, Forms.Cursor.Position.Y - _desktop.Y);
+    protected override void OnMouseDown(Forms.MouseEventArgs e)
+    {
+        base.OnMouseDown(e);
+        if (e.Button == Forms.MouseButtons.Right) { DialogResult = Forms.DialogResult.Cancel; return; }
+        if (e.Button != Forms.MouseButtons.Left) return;
+        if (_mode == CaptureMode.Region) { _anchor = Pointer; _dragging = true; Capture = true; }
+        else Finish();
+    }
+    protected override void OnMouseMove(Forms.MouseEventArgs e) { base.OnMouseMove(e); UpdateSelection(); }
+    private void UpdateSelection()
+    {
+        var position = Pointer;
+        if (_mode == CaptureMode.Region && _dragging)
+            _selection = Drawing.Rectangle.FromLTRB(Math.Min(_anchor.X, position.X), Math.Min(_anchor.Y, position.Y), Math.Max(_anchor.X, position.X), Math.Max(_anchor.Y, position.Y));
+        else if (_mode == CaptureMode.Display)
+        {
+            _selection = Forms.Screen.FromPoint(Forms.Cursor.Position).Bounds;
+            _selection.Offset(-_desktop.X, -_desktop.Y);
+        }
+        else if (_mode == CaptureMode.Window)
+        {
+            var item = _windows.FirstOrDefault(x => x.Bounds.Contains(Forms.Cursor.Position));
+            SelectedWindow = item.Handle;
+            _selection = item.Bounds;
+            _selection.Offset(-_desktop.X, -_desktop.Y);
+        }
+        _selection.Intersect(new Drawing.Rectangle(Drawing.Point.Empty, _desktop.Size));
+        Invalidate();
+    }
+    protected override void OnMouseUp(Forms.MouseEventArgs e)
+    {
+        base.OnMouseUp(e);
+        if (_mode == CaptureMode.Region && _dragging && e.Button == Forms.MouseButtons.Left)
+        { UpdateSelection(); _dragging = false; Capture = false; Finish(); }
+    }
+    private void Finish()
+    {
+        if (_selection.Width < 2 || _selection.Height < 2 || (_mode == CaptureMode.Window && SelectedWindow == 0)) return;
+        if (_mode != CaptureMode.Window)
+        {
+            using var cropped = _snapshot.Clone(_selection, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            Result = CaptureService.FromDrawingBitmap(cropped);
+        }
+        DialogResult = Forms.DialogResult.OK;
+    }
+    protected override void OnKeyDown(Forms.KeyEventArgs e)
+    { if (e.KeyCode == Forms.Keys.Escape) DialogResult = Forms.DialogResult.Cancel; base.OnKeyDown(e); }
+    protected override void OnPaint(Forms.PaintEventArgs e)
+    {
+        e.Graphics.DrawImageUnscaled(_snapshot, 0, 0);
+        using var shade = new Drawing.SolidBrush(Drawing.Color.FromArgb(140, 13, 20, 36));
+        e.Graphics.FillRectangle(shade, ClientRectangle);
+        if (_selection.Width > 0 && _selection.Height > 0)
+        {
+            e.Graphics.DrawImage(_snapshot, _selection, _selection, Drawing.GraphicsUnit.Pixel);
+            using var pen = new Drawing.Pen(Drawing.Color.FromArgb(129, 140, 248), 2);
+            e.Graphics.DrawRectangle(pen, _selection);
+        }
+        var screen = Forms.Screen.FromPoint(Forms.Cursor.Position).Bounds;
+        int left = screen.Left - _desktop.Left + 24, top = screen.Top - _desktop.Top + 24;
+        var hint = _mode switch { CaptureMode.Region => "Drag to capture a region", CaptureMode.Window => "Click a window to capture", _ => "Click a display to capture" };
+        using var font = new Drawing.Font("Segoe UI", 12);
+        using var background = new Drawing.SolidBrush(Drawing.Color.FromArgb(245, 23, 36, 58));
+        e.Graphics.FillRectangle(background, left, top, 440, 52);
+        e.Graphics.DrawString(hint + "   ·   Esc to cancel", font, Drawing.Brushes.White, left + 16, top + 15);
+    }
+    protected override void Dispose(bool disposing) { if (disposing) _snapshot.Dispose(); base.Dispose(disposing); }
+}
+
+internal static class Native
+{
+    [StructLayout(LayoutKind.Sequential)] internal struct Rect { public int Left, Top, Right, Bottom; }
+    internal delegate bool EnumProc(nint hwnd, nint parameter);
+    [DllImport("user32.dll")] internal static extern bool EnumWindows(EnumProc callback, nint parameter);
+    [DllImport("user32.dll")] internal static extern bool IsWindowVisible(nint hwnd);
+    [DllImport("user32.dll")] internal static extern bool IsIconic(nint hwnd);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern int GetWindowTextLength(nint hwnd);
+    [DllImport("user32.dll")] internal static extern bool GetWindowRect(nint hwnd, out Rect rect);
+    [DllImport("user32.dll")] internal static extern uint GetWindowThreadProcessId(nint hwnd, out uint process);
+    [DllImport("dwmapi.dll")] internal static extern int DwmGetWindowAttribute(nint hwnd, int attribute, out Rect rect, int size);
+    [DllImport("dwmapi.dll")] internal static extern int DwmGetWindowAttribute(nint hwnd, int attribute, out int value, int size);
+    [DllImport("user32.dll")] internal static extern bool SetWindowPos(nint hwnd, nint after, int x, int y, int width, int height, uint flags);
+}
