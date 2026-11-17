@@ -17,7 +17,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _operation;
     private HotkeyService? _hotkey;
     private Shortcut _shortcut = Preferences.Load();
-    private bool _ready, _busy, _exiting, _exitAfterWork, _previewReady;
+    private bool _ready, _busy, _exiting, _exitAfterWork, _previewReady, _choosingShortcut;
 
     public MainWindow()
     {
@@ -39,7 +39,9 @@ public partial class MainWindow : Window
         SourceInitialized += (_, _) =>
         {
             _hotkey = new HotkeyService(this, () => _ = BeginCaptureAsync());
-            if (!_hotkey.Register(_shortcut)) SetStatus("The capture shortcut is already in use. Click the shortcut button to choose another.");
+            if (!_hotkey.Register(_shortcut)) SetStatus(_shortcut.IsPrintScreen
+                ? "Print Screen is unavailable. Turn off Windows' Print Screen screen-capture setting, then select Use Print Screen again."
+                : "The capture shortcut is already in use. Click the shortcut button to choose another.");
         };
         Closing += OnClosing;
         _ready = true;
@@ -122,7 +124,7 @@ public partial class MainWindow : Window
 
     private async Task BeginCaptureAsync()
     {
-        if (_busy || _exiting) return;
+        if (_busy || _exiting || _choosingShortcut) return;
         var mode = (CaptureMode)CaptureModeBox.SelectedIndex;
         await RunOperation(async _ =>
         {
@@ -332,8 +334,18 @@ public partial class MainWindow : Window
     private void Shortcut_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new ShortcutWindow(_shortcut) { Owner = this };
-        if (dialog.ShowDialog() != true || dialog.Chosen == _shortcut) return;
-        if (_hotkey?.Register(dialog.Chosen) != true) { SetStatus("That shortcut is already in use. The previous shortcut is unchanged."); return; }
+        bool? accepted;
+        _choosingShortcut = true;
+        try { accepted = dialog.ShowDialog(); }
+        finally { _choosingShortcut = false; }
+        if (accepted != true) return;
+        if (_hotkey?.Register(dialog.Chosen) != true)
+        {
+            SetStatus(dialog.Chosen.IsPrintScreen
+                ? "Print Screen is unavailable. Turn off Windows' Print Screen screen-capture setting and check other screenshot apps, then try again. The previous shortcut is unchanged."
+                : "That shortcut is already in use. The previous shortcut is unchanged.");
+            return;
+        }
         _shortcut = dialog.Chosen; ShortcutButton.Content = _shortcut.ToString();
         try { Preferences.Save(_shortcut); SetStatus("Capture shortcut updated to " + _shortcut + "."); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { SetStatus("Shortcut changed for this session, but preferences could not be saved."); }

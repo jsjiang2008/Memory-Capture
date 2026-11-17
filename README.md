@@ -4,7 +4,7 @@ A portable Windows 11 screenshot tool and local image converter. Captures stay i
 
 ## Run
 
-Extract **MemoryCapture-win-x64.zip** into a folder and open **MemoryCapture.exe**. Keep the executable, DLLs, and `policy.xml` together. The portable package includes .NET and the image codecs; no installer, administrator access, or Microsoft Store HEIC extension is required.
+Extract **MemoryCapture-1.1.0-win-x64.zip** into a folder and open **MemoryCapture.exe**. Keep the executable, DLLs, and `policy.xml` together. The portable package includes .NET and the image codecs; no installer, administrator access, or Microsoft Store HEIC extension is required.
 
 If another copy is running, open it from the system tray. Save or copy anything you need before choosing **Exit**, then open the new version.
 
@@ -15,6 +15,20 @@ If another copy is running, open it from the system tray. Save or copy anything 
 3. Use **Copy** to paste the image elsewhere, or **Save as…** to create a PNG, JPG, or WebP file.
 
 The history holds up to **20 captures or 256 MB**, evicting the oldest entries at the limit. **Delete** and **Clear all** remove temporary captures. Closing the window keeps the app running in the tray; **Exit** discards the history. Saved files and copied clipboard images remain independent of the history.
+
+## Using the Print Screen key
+
+Memory Capture supports **PrtSc / Print Screen** as a standalone capture shortcut.
+
+1. Open **Windows Settings**, search for **Print Screen**, and turn off **Use the Print Screen key to open screen capture/snipping**. The wording may vary by Windows version. See [Microsoft's keyboard shortcut instructions](https://support.microsoft.com/en-gb/accessibility/windows/keyboard-shortcuts-in-windows).
+2. In Memory Capture, click the shortcut button at the top (initially **Ctrl + Shift + S**), then click **Use Print Screen**. You can also press PrtSc in the shortcut dialog and click **Use shortcut**.
+3. Keep Memory Capture running in the system tray. Press **PrtSc** to activate the selected region, window, or full-display capture mode. Nothing is automatically copied or saved; use **Copy** or **Save** when ready.
+
+Your choice is remembered across launches. Closing the app window keeps its shortcut active in the tray; choosing **Exit** stops it. On some laptops, you may need **Fn + PrtSc** to send Print Screen.
+
+If Print Screen is unavailable, disable the Windows setting and any competing screenshot app's Print Screen shortcut, then select **Use Print Screen** again. A failed change leaves the previous shortcut active. If Windows still opens its own capture tool, recheck the setting and restart Memory Capture. The app does not change Windows settings for you.
+
+To switch back, click the shortcut button, press **Ctrl + Shift + S**, and click **Use shortcut**. Existing installations retain their shortcut until you choose a new one.
 
 ## Convert images
 
@@ -41,7 +55,9 @@ Requires Windows and the .NET 10 SDK. From PowerShell in this folder:
 .\build.ps1 -Test -Package
 ```
 
-The ZIP and unpacked portable app are created in `dist`. Build caches stay in `.build` and `.packages`. The image library is pinned to Magick.NET-Q8-x64 15.1.0.
+The versioned ZIP and unpacked portable app are created in `dist` (for example, `MemoryCapture-1.1.0-win-x64`). Build caches stay in `.build` and `.packages`. The image library is pinned to Magick.NET-Q8-x64 15.1.0.
+
+`-HotkeyTest` checks actual Windows shortcut registration, conflicts, switching, and cleanup using hidden test windows. It briefly claims Print Screen if available, then releases it without changing Windows settings.
 
 `-DesktopTest` additionally opens a temporary colored test window to verify actual Windows Graphics Capture and clipboard round-tripping. This replaces the clipboard with a small generated test image.
 

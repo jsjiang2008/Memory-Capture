@@ -7,8 +7,12 @@ namespace MemoryCapture;
 
 public sealed record Shortcut(uint Modifiers = 6, uint VirtualKey = 0x53)
 {
+    public static Shortcut PrintScreen { get; } = new(0, 0x2C);
+    public bool IsPrintScreen => Modifiers == 0 && VirtualKey == 0x2C;
+
     public override string ToString()
     {
+        if (IsPrintScreen) return "Print Screen";
         var parts = new List<string>();
         if ((Modifiers & 2) != 0) parts.Add("Ctrl");
         if ((Modifiers & 4) != 0) parts.Add("Shift");
@@ -16,8 +20,8 @@ public sealed record Shortcut(uint Modifiers = 6, uint VirtualKey = 0x53)
         parts.Add(KeyInterop.KeyFromVirtualKey((int)VirtualKey).ToString());
         return string.Join(" + ", parts);
     }
-    public bool IsValid => (Modifiers & ~7u) == 0 && (Modifiers & 3) != 0 &&
-        (VirtualKey is >= 0x41 and <= 0x5A or >= 0x30 and <= 0x39 or >= 0x70 and <= 0x7A);
+    public bool IsValid => IsPrintScreen || ((Modifiers & ~7u) == 0 && (Modifiers & 3) != 0 &&
+        (VirtualKey is >= 0x41 and <= 0x5A or >= 0x30 and <= 0x39 or >= 0x70 and <= 0x7A));
 }
 
 public sealed class HotkeyService : IDisposable
@@ -26,6 +30,7 @@ public sealed class HotkeyService : IDisposable
     private readonly Action _action;
     private int _currentId;
     private int _nextId = 100;
+    public Shortcut? RegisteredShortcut { get; private set; }
     public HotkeyService(Window window, Action action)
     {
         _source = HwndSource.FromHwnd(new WindowInteropHelper(window).Handle)!;
@@ -35,10 +40,12 @@ public sealed class HotkeyService : IDisposable
     public bool Register(Shortcut shortcut)
     {
         if (!shortcut.IsValid) return false;
+        if (RegisteredShortcut == shortcut) return true;
         int id = _nextId++;
         if (!RegisterHotKey(_source.Handle, id, shortcut.Modifiers | 0x4000, shortcut.VirtualKey)) return false;
         if (_currentId != 0) UnregisterHotKey(_source.Handle, _currentId);
         _currentId = id;
+        RegisteredShortcut = shortcut;
         return true;
     }
     private nint Hook(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)
@@ -49,6 +56,8 @@ public sealed class HotkeyService : IDisposable
     public void Dispose()
     {
         if (_currentId != 0) UnregisterHotKey(_source.Handle, _currentId);
+        _currentId = 0;
+        RegisteredShortcut = null;
         _source.RemoveHook(Hook);
     }
     [DllImport("user32.dll", SetLastError = true)] private static extern bool RegisterHotKey(nint hwnd, int id, uint modifiers, uint key);
@@ -77,10 +86,14 @@ internal sealed class ShortcutWindow : Window
     public ShortcutWindow(Shortcut current)
     {
         Chosen = current;
-        Title = "Capture shortcut"; Width = 450; Height = 245; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Title = "Capture shortcut"; Width = 520; SizeToContent = SizeToContent.Height; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         var panel = new StackPanel { Margin = new Thickness(24) };
         panel.Children.Add(new TextBlock { Text = "Press your new shortcut", FontSize = 20, FontWeight = FontWeights.SemiBold });
-        panel.Children.Add(new TextBlock { Text = "Use Ctrl or Alt with a letter, number, or F1–F11.", Margin = new Thickness(0, 8, 0, 16), Foreground = Brushes.SlateGray });
+        panel.Children.Add(new TextBlock { Text = "Choose Print Screen below, or press Ctrl/Alt with a letter, number, or F1–F11.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 16), Foreground = Brushes.SlateGray });
+        var printScreen = new Button { Content = "Use Print Screen", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 12) };
+        printScreen.Click += (_, _) => { Chosen = Shortcut.PrintScreen; DialogResult = true; };
+        panel.Children.Add(printScreen);
+        panel.Children.Add(new TextBlock { Text = "For Print Screen: in Windows Settings, search for Print Screen and turn off the option that opens screen capture/snipping. Keep Memory Capture running in the tray.", TextWrapping = TextWrapping.Wrap, Foreground = Brushes.SlateGray, FontSize = 12, Margin = new Thickness(0, 0, 0, 16) });
         _display = new TextBlock { Text = current.ToString(), FontSize = 20, Foreground = Brushes.Indigo, Margin = new Thickness(0, 0, 0, 20) };
         panel.Children.Add(_display);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal };
@@ -88,6 +101,13 @@ internal sealed class ShortcutWindow : Window
         save.Click += (_, _) => { DialogResult = true; };
         var cancel = new Button { Content = "Cancel", IsCancel = true };
         buttons.Children.Add(save); buttons.Children.Add(cancel); panel.Children.Add(buttons); Content = panel;
+        // Some keyboards report Print Screen only on key-up; the button also avoids
+        // having to press a key that Windows or another app may currently own.
+        PreviewKeyUp += (_, e) =>
+        {
+            if (e.Key == Key.PrintScreen && Keyboard.Modifiers == ModifierKeys.None)
+            { Chosen = Shortcut.PrintScreen; _display.Text = Chosen.ToString(); e.Handled = true; }
+        };
         PreviewKeyDown += (_, e) =>
         {
             var key = e.Key == Key.System ? e.SystemKey : e.Key;

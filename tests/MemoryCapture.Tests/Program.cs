@@ -34,6 +34,7 @@ internal static class Program
         try
         {
             if (args.Contains("--desktop")) return DesktopChecks();
+            if (args.Contains("--hotkeys")) { ShortcutChecks.Desktop(Check); return 0; }
             string root = Path.GetFullPath(args.FirstOrDefault() ?? "test-results");
             Directory.CreateDirectory(root);
             string fixtures = Path.Combine(root, "fixtures");
@@ -122,7 +123,7 @@ internal static class Program
             Throws(() => service.EncodeFile(png, new(OutputFormat.PNG), default), "memory exhaustion fails instead of spilling to disk");
             ResourceLimits.Memory = previousMemory;
             Check(!Directory.EnumerateFiles(cache, "*", SearchOption.AllDirectories).Any(), "codec cache directory stays empty under memory pressure");
-            Check(new Shortcut().IsValid && !new Shortcut(0, 0x53).IsValid && !new Shortcut(6, 0x7B).IsValid, "shortcut validation rejects bare keys and reserved F12");
+            ShortcutChecks.Validation(Check);
             Console.WriteLine($"\n{_passed} checks passed. Outputs: {output}");
             return 0;
         }
