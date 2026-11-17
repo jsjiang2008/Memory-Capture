@@ -11,6 +11,8 @@ public partial class MainWindow : Window
     private readonly CaptureHistory _history = new();
     private readonly ObservableCollection<ConversionItem> _files = [];
     private readonly ImagingService _imaging = new();
+    private readonly StartupService _startup = StartupService.ForCurrentApp();
+    private bool _startupAvailable;
     private readonly SemaphoreSlim _imagingGate = new(1, 1);
     private readonly Forms.NotifyIcon _tray;
     private CancellationTokenSource? _previewCancellation;
@@ -22,6 +24,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        Title = $"Memory Capture {typeof(App).Assembly.GetName().Version?.ToString(3)}";
         var iconUri = new Uri("pack://application:,,,/Assets/App.ico");
         Icon = BitmapFrame.Create(iconUri);
         CaptureList.ItemsSource = _history.Items;
@@ -44,9 +47,48 @@ public partial class MainWindow : Window
                 : "The capture shortcut is already in use. Click the shortcut button to choose another.");
         };
         Closing += OnClosing;
+        Activated += (_, _) => RefreshStartupOption();
         _ready = true;
         ShortcutButton.Content = _shortcut.ToString();
+        RefreshStartupOption();
         RefreshControls();
+    }
+
+    private void RefreshStartupOption()
+    {
+        try
+        {
+            var registration = _startup.GetRegistration();
+            StartupCheckBox.IsChecked = registration == StartupRegistration.ThisCopy;
+            StartupCheckBox.ToolTip = registration == StartupRegistration.OtherCopy
+                ? "Another copy of Memory Capture is configured to start. Check this box to use this version instead."
+                : "Start quietly in the system tray when you sign in. Windows Startup Apps settings can override this choice.";
+            _startupAvailable = true;
+            StartupCheckBox.IsEnabled = !_busy;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException or ArgumentException or InvalidOperationException)
+        {
+            _startupAvailable = false;
+            StartupCheckBox.IsEnabled = false;
+            StartupCheckBox.ToolTip = "Could not read the Windows startup setting: " + ex.Message;
+        }
+    }
+
+    private void Startup_Click(object sender, RoutedEventArgs e)
+    {
+        bool enabled = StartupCheckBox.IsChecked == true;
+        try
+        {
+            _startup.SetEnabled(enabled);
+            SetStatus(enabled
+                ? "Start with Windows enabled. This copy will launch in the tray when you sign in."
+                : "Start with Windows disabled. The current session stays open.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException or ArgumentException or InvalidOperationException)
+        {
+            SetStatus("Could not change Start with Windows: " + ex.Message);
+        }
+        finally { RefreshStartupOption(); }
     }
 
     private void ShowApp() { Show(); WindowState = WindowState.Normal; Activate(); }
@@ -82,6 +124,7 @@ public partial class MainWindow : Window
         FileCount.Text = $"IMAGE QUEUE · {_files.Count}";
         QueueEmpty.Visibility = _files.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         NewCaptureButton.IsEnabled = CaptureModeBox.IsEnabled = ShortcutButton.IsEnabled = !_busy;
+        StartupCheckBox.IsEnabled = !_busy && _startupAvailable;
         CopyCaptureButton.IsEnabled = SaveCaptureButton.IsEnabled = DeleteCaptureButton.IsEnabled = capture && !_busy;
         ClearCapturesButton.IsEnabled = _history.Items.Count > 0 && !_busy;
         CaptureList.IsEnabled = FileList.IsEnabled = AddFilesButton.IsEnabled = OutputFormatBox.IsEnabled = !_busy;

@@ -1,4 +1,4 @@
-param([switch]$Test, [switch]$DesktopTest, [switch]$HotkeyTest, [switch]$Package)
+param([switch]$Test, [switch]$DesktopTest, [switch]$HotkeyTest, [switch]$StartupTest, [switch]$Package)
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 $env:DOTNET_CLI_HOME = Join-Path $PSScriptRoot '.build'
@@ -21,6 +21,10 @@ if ($HotkeyTest) {
     & './tests/MemoryCapture.Tests/bin/Release/net10.0-windows10.0.19041.0/MemoryCapture.Tests.exe' --hotkeys
     if ($LASTEXITCODE -ne 0) { throw 'Hotkey tests failed.' }
 }
+if ($StartupTest) {
+    & './tests/MemoryCapture.Tests/bin/Release/net10.0-windows10.0.19041.0/MemoryCapture.Tests.exe' --startup-tests
+    if ($LASTEXITCODE -ne 0) { throw 'Startup tests failed.' }
+}
 if ($Package) {
     $version = ([xml](Get-Content 'src/MemoryCapture/MemoryCapture.csproj' -Raw)).Project.PropertyGroup.Version
     $packageName = "MemoryCapture-$version-win-x64"
@@ -29,6 +33,7 @@ if ($Package) {
     if ($LASTEXITCODE -ne 0) { throw 'Publish failed.' }
     Copy-Item -LiteralPath README.md -Destination $destination
     Copy-Item -LiteralPath THIRD-PARTY-NOTICES.md -Destination $destination
+    Copy-Item -LiteralPath CHANGELOG.md -Destination $destination
     Copy-Item -LiteralPath VERIFICATION.md -Destination $destination
     Copy-Item -LiteralPath licenses -Destination $destination -Recurse -Force
     $frameworks = (Get-Content "$destination/MemoryCapture.runtimeconfig.json" -Raw | ConvertFrom-Json).runtimeOptions.includedFrameworks

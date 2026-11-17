@@ -7,10 +7,11 @@ public partial class App : Application
     {
         base.OnStartup(e);
         AppDomain.CurrentDomain.UnhandledException += (_, error) => Console.Error.WriteLine(error.ExceptionObject);
+        bool startInTray = StartupLaunch.IsStartupLaunch(e.Args);
         _instance = new Mutex(true, "Local\\MemoryCapture.Desktop", out var created);
         if (!created)
         {
-            MessageBox.Show("Memory Capture is already running. Open it from the system tray.", "Memory Capture");
+            if (!startInTray) MessageBox.Show("Memory Capture is already running. Open it from the system tray.", "Memory Capture");
             Shutdown();
             return;
         }
@@ -18,7 +19,7 @@ public partial class App : Application
         {
             ImagingService.Initialize();
             MainWindow = new MainWindow();
-            MainWindow.Show();
+            StartupLaunch.OpenWindow(MainWindow, startInTray);
         }
         catch (Exception ex)
         {

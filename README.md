@@ -1,10 +1,10 @@
 # Memory Capture
 
-A portable Windows 11 screenshot tool and local image converter. Captures stay in memory until you explicitly save them.
+A portable Windows 11 screenshot tool and local image converter. Captures stay in memory until you explicitly save them, preventing random screenshots from cluttering your hard drive. Memory Capture also allows for image type conversion, meaning no more searching up a conversion website on Google and wasting a bunch of your time.
 
 ## Run
 
-Extract **MemoryCapture-1.1.0-win-x64.zip** into a folder and open **MemoryCapture.exe**. Keep the executable, DLLs, and `policy.xml` together. The portable package includes .NET and the image codecs; no installer, administrator access, or Microsoft Store HEIC extension is required.
+Extract **MemoryCapture-1.2.0-win-x64.zip** into a folder and open **MemoryCapture.exe**. Keep the executable, DLLs, and `policy.xml` together. The portable package includes .NET and the image codecs; no installer, administrator access, or Microsoft Store HEIC extension is required.
 
 If another copy is running, open it from the system tray. Save or copy anything you need before choosing **Exit**, then open the new version.
 
@@ -30,6 +30,14 @@ If Print Screen is unavailable, disable the Windows setting and any competing sc
 
 To switch back, click the shortcut button, press **Ctrl + Shift + S**, and click **Use shortcut**. Existing installations retain their shortcut until you choose a new one.
 
+## Start with Windows
+
+Check **Start with Windows** in the top-right corner of the app. At your next Windows sign-in, Memory Capture starts quietly in the system tray with your saved capture shortcut active. Double-click the tray icon to open the window. Uncheck the option to stop future automatic launches; the current session stays open.
+
+The option is off by default, applies only to your Windows account, and needs no administrator access. Keep the portable app in a permanent folder before enabling it. After moving the app or upgrading into a new folder, open the new copy and check the option there to update the startup location. The window title shows the version you are running.
+
+If you previously added a shortcut through `shell:startup`, remove that manual shortcut to avoid duplicate launches. If Windows Settings > Apps > Startup has disabled Memory Capture, re-enable it there too. Windows can delay startup apps after sign-in.
+
 ## Convert images
 
 Add or drop HEIC/HEIF, PNG, JPG/JPEG, WebP, BMP, or TIFF files. Select a file to preview it, choose **PNG**, **JPG**, or **WebP**, and adjust JPG/WebP quality if needed.
@@ -45,7 +53,7 @@ Dimensions and orientation are preserved, colors are converted to sRGB, and desc
 
 The app does not save captures, preview thumbnails, conversion queues, or temporary image files. ImageMagick disk and mapped caches are disabled. HEIC is read directly from its existing original because passing it to the native decoder as a stream or byte array would create a temporary copy. All screenshot encoding and conversion output stays in memory until Save.
 
-Only your chosen shortcut is persisted, at `%LOCALAPPDATA%\MemoryCapture\settings.json`. Processing is local; the app contains no upload or telemetry feature. Windows controls paging, crash dumps, clipboard history/synchronization, and file-picker history. Memory-only operation is not a guarantee that Windows never writes RAM or copied data to disk.
+Your chosen shortcut is persisted at `%LOCALAPPDATA%\MemoryCapture\settings.json`. Enabling **Start with Windows** also creates the `MemoryCapture` value under `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`; turning it off removes that value. Neither setting contains image data. Processing is local; the app contains no upload or telemetry feature. Windows controls paging, crash dumps, clipboard history/synchronization, and file-picker history. Memory-only operation is not a guarantee that Windows never writes RAM or copied data to disk.
 
 ## Build and test
 
@@ -55,9 +63,11 @@ Requires Windows and the .NET 10 SDK. From PowerShell in this folder:
 .\build.ps1 -Test -Package
 ```
 
-The versioned ZIP and unpacked portable app are created in `dist` (for example, `MemoryCapture-1.1.0-win-x64`). Build caches stay in `.build` and `.packages`. The image library is pinned to Magick.NET-Q8-x64 15.1.0.
+The versioned ZIP and unpacked portable app are created in `dist` (for example, `MemoryCapture-1.2.0-win-x64`). Build caches stay in `.build` and `.packages`. The image library is pinned to Magick.NET-Q8-x64 15.1.0.
 
 `-HotkeyTest` checks actual Windows shortcut registration, conflicts, switching, and cleanup using hidden test windows. It briefly claims Print Screen if available, then releases it without changing Windows settings.
+
+`-StartupTest` checks startup registration in an isolated temporary registry key, path validation, enable/disable, upgrades, and hidden-window shortcut registration. It does not enable startup for your account. It briefly opens a test window.
 
 `-DesktopTest` additionally opens a temporary colored test window to verify actual Windows Graphics Capture and clipboard round-tripping. This replaces the clipboard with a small generated test image.
 
@@ -69,6 +79,6 @@ WPF provides the main interface. A physical-pixel WinForms overlay handles multi
 
 ## Current limits
 
-Windows x64 only. There is no annotation, scrolling capture, video recording, automatic startup, or HDR fidelity guarantee. Minimized windows must be restored; protected content may be blank or unavailable. Mixed-DPI and negative-coordinate handling is implemented in physical pixels, but still needs hands-on validation on a multi-monitor setup. A clean Windows machine without .NET or HEIC extensions was not available for independent testing; the self-contained package includes both dependencies.
+Windows x64 only. There is no annotation, scrolling capture, video recording, or HDR fidelity guarantee. Minimized windows must be restored; protected content may be blank or unavailable. Mixed-DPI and negative-coordinate handling is implemented in physical pixels, but still needs hands-on validation on a multi-monitor setup. A clean Windows machine without .NET or HEIC extensions was not available for independent testing; the self-contained package includes both dependencies.
 
 See `VERIFICATION.md` for the checks performed and `THIRD-PARTY-NOTICES.md` for dependencies.
