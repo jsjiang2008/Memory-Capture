@@ -33,6 +33,7 @@ internal static class Program
     {
         try
         {
+            if (args.Contains("--chooser-tests")) { ChooserChecks.Run(Check); Console.WriteLine($"{_passed} chooser checks passed."); return 0; }
             if (args.Contains("--startup-tests")) { StartupChecks.Run(Check); Console.WriteLine($"{_passed} startup checks passed."); return 0; }
             if (args.Contains("--desktop")) return DesktopChecks();
             if (args.Contains("--hotkeys")) { ShortcutChecks.Desktop(Check); return 0; }

@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.3.1 — 2026-11-18
+
+- Show the app name and version in the main window, screenshot chooser, and capture shortcut dialog title bars (for example, **Memory Capture 1.3.1**).
+- Read all three titles from the built app version so they stay consistent with future updates.
+
+Save any captures you need and exit the older app before opening 1.3.1. If you use **Start with Windows**, enable it in the new copy to update the startup location.
+
+## 1.3.0 — 2026-11-17
+
+- Print Screen now opens a capture chooser with **Region (drag)**, **Window**, and **Full screen** options before taking a screenshot.
+- Added **R**, **W**, and **F** keys for choosing a mode, plus **Escape** to cancel.
+- Cancelling a Print Screen capture from the tray keeps the main window hidden. Repeated shortcut presses do not open additional choosers during capture.
+- The chooser closes before the screen is captured, and images remain in memory until copied or saved.
+
+Save any captures you need and exit the older app before opening 1.3.0. If you use **Start with Windows**, enable it in the new copy to update the startup location.
+
 ## 1.2.0 — 2026-11-17
 
 - Added an optional **Start with Windows** checkbox. Automatic launches open quietly in the system tray with the saved capture shortcut active.

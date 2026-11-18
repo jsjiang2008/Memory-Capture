@@ -86,7 +86,7 @@ internal sealed class ShortcutWindow : Window
     public ShortcutWindow(Shortcut current)
     {
         Chosen = current;
-        Title = "Capture shortcut"; Width = 520; SizeToContent = SizeToContent.Height; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Title = $"{App.DisplayName} - Capture shortcut"; Width = 520; SizeToContent = SizeToContent.Height; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         var panel = new StackPanel { Margin = new Thickness(24) };
         panel.Children.Add(new TextBlock { Text = "Press your new shortcut", FontSize = 20, FontWeight = FontWeights.SemiBold });
         panel.Children.Add(new TextBlock { Text = "Choose Print Screen below, or press Ctrl/Alt with a letter, number, or F1–F11.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 16), Foreground = Brushes.SlateGray });

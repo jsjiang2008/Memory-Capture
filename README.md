@@ -4,7 +4,7 @@ A portable Windows 11 screenshot tool and local image converter. Captures stay i
 
 ## Run
 
-Extract **MemoryCapture-1.2.0-win-x64.zip** into a folder and open **MemoryCapture.exe**. Keep the executable, DLLs, and `policy.xml` together. The portable package includes .NET and the image codecs; no installer, administrator access, or Microsoft Store HEIC extension is required.
+Extract **MemoryCapture-1.3.1-win-x64.zip** into a folder and open **MemoryCapture.exe**. Keep the executable, DLLs, and `policy.xml` together. The portable package includes .NET and the image codecs; no installer, administrator access, or Microsoft Store HEIC extension is required.
 
 If another copy is running, open it from the system tray. Save or copy anything you need before choosing **Exit**, then open the new version.
 
@@ -22,9 +22,9 @@ Memory Capture supports **PrtSc / Print Screen** as a standalone capture shortcu
 
 1. Open **Windows Settings**, search for **Print Screen**, and turn off **Use the Print Screen key to open screen capture/snipping**. The wording may vary by Windows version. See [Microsoft's keyboard shortcut instructions](https://support.microsoft.com/en-gb/accessibility/windows/keyboard-shortcuts-in-windows).
 2. In Memory Capture, click the shortcut button at the top (initially **Ctrl + Shift + S**), then click **Use Print Screen**. You can also press PrtSc in the shortcut dialog and click **Use shortcut**.
-3. Keep Memory Capture running in the system tray. Press **PrtSc** to activate the selected region, window, or full-display capture mode. Nothing is automatically copied or saved; use **Copy** or **Save** when ready.
+3. Keep Memory Capture running in the system tray. Press **PrtSc** to open the capture chooser. Select **Region (drag)**, **Window**, or **Full screen**, then drag an area or click a window/display. You can also press **R**, **W**, or **F** in the chooser; **Escape** cancels. Nothing is automatically copied or saved; use **Copy** or **Save** when ready.
 
-Your choice is remembered across launches. Closing the app window keeps its shortcut active in the tray; choosing **Exit** stops it. On some laptops, you may need **Fn + PrtSc** to send Print Screen.
+Your shortcut choice is remembered across launches. Print Screen asks for the capture type each time. **New capture**, the tray capture command, and other configured shortcuts continue to use the mode selected in the main window. Cancelling the chooser or selection while the app is in the tray leaves it there. Closing the app window keeps its shortcut active in the tray; choosing **Exit** stops it. On some laptops, you may need **Fn + PrtSc** to send Print Screen.
 
 If Print Screen is unavailable, disable the Windows setting and any competing screenshot app's Print Screen shortcut, then select **Use Print Screen** again. A failed change leaves the previous shortcut active. If Windows still opens its own capture tool, recheck the setting and restart Memory Capture. The app does not change Windows settings for you.
 
@@ -34,7 +34,7 @@ To switch back, click the shortcut button, press **Ctrl + Shift + S**, and click
 
 Check **Start with Windows** in the top-right corner of the app. At your next Windows sign-in, Memory Capture starts quietly in the system tray with your saved capture shortcut active. Double-click the tray icon to open the window. Uncheck the option to stop future automatic launches; the current session stays open.
 
-The option is off by default, applies only to your Windows account, and needs no administrator access. Keep the portable app in a permanent folder before enabling it. After moving the app or upgrading into a new folder, open the new copy and check the option there to update the startup location. The window title shows the version you are running.
+The option is off by default, applies only to your Windows account, and needs no administrator access. Keep the portable app in a permanent folder before enabling it. After moving the app or upgrading into a new folder, open the new copy and check the option there to update the startup location. The main window, screenshot chooser, and capture shortcut dialog show the running app version in their title bars.
 
 If you previously added a shortcut through `shell:startup`, remove that manual shortcut to avoid duplicate launches. If Windows Settings > Apps > Startup has disabled Memory Capture, re-enable it there too. Windows can delay startup apps after sign-in.
 
@@ -63,9 +63,11 @@ Requires Windows and the .NET 10 SDK. From PowerShell in this folder:
 .\build.ps1 -Test -Package
 ```
 
-The versioned ZIP and unpacked portable app are created in `dist` (for example, `MemoryCapture-1.2.0-win-x64`). Build caches stay in `.build` and `.packages`. The image library is pinned to Magick.NET-Q8-x64 15.1.0.
+The versioned ZIP and unpacked portable app are created in `dist` (for example, `MemoryCapture-1.3.1-win-x64`). Build caches stay in `.build` and `.packages`. The image library is pinned to Magick.NET-Q8-x64 15.1.0.
 
 `-HotkeyTest` checks actual Windows shortcut registration, conflicts, switching, and cleanup using hidden test windows. It briefly claims Print Screen if available, then releases it without changing Windows settings.
+
+`-ChooserTest` checks the capture chooser buttons, keyboard selection, cancellation, and reopening using temporary test windows without taking screenshots.
 
 `-StartupTest` checks startup registration in an isolated temporary registry key, path validation, enable/disable, upgrades, and hidden-window shortcut registration. It does not enable startup for your account. It briefly opens a test window.
 

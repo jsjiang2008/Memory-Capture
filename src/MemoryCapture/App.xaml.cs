@@ -2,6 +2,8 @@ namespace MemoryCapture;
 
 public partial class App : Application
 {
+    public static string DisplayName => $"Memory Capture {typeof(App).Assembly.GetName().Version?.ToString(3)}";
+
     private Mutex? _instance;
     protected override void OnStartup(StartupEventArgs e)
     {

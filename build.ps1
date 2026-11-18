@@ -1,4 +1,4 @@
-param([switch]$Test, [switch]$DesktopTest, [switch]$HotkeyTest, [switch]$StartupTest, [switch]$Package)
+param([switch]$Test, [switch]$DesktopTest, [switch]$HotkeyTest, [switch]$StartupTest, [switch]$ChooserTest, [switch]$Package)
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 $env:DOTNET_CLI_HOME = Join-Path $PSScriptRoot '.build'
@@ -24,6 +24,10 @@ if ($HotkeyTest) {
 if ($StartupTest) {
     & './tests/MemoryCapture.Tests/bin/Release/net10.0-windows10.0.19041.0/MemoryCapture.Tests.exe' --startup-tests
     if ($LASTEXITCODE -ne 0) { throw 'Startup tests failed.' }
+}
+if ($ChooserTest) {
+    & './tests/MemoryCapture.Tests/bin/Release/net10.0-windows10.0.19041.0/MemoryCapture.Tests.exe' --chooser-tests
+    if ($LASTEXITCODE -ne 0) { throw 'Capture chooser tests failed.' }
 }
 if ($Package) {
     $version = ([xml](Get-Content 'src/MemoryCapture/MemoryCapture.csproj' -Raw)).Project.PropertyGroup.Version

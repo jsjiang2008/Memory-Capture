@@ -24,7 +24,6 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        Title = $"Memory Capture {typeof(App).Assembly.GetName().Version?.ToString(3)}";
         var iconUri = new Uri("pack://application:,,,/Assets/App.ico");
         Icon = BitmapFrame.Create(iconUri);
         CaptureList.ItemsSource = _history.Items;
@@ -41,7 +40,7 @@ public partial class MainWindow : Window
         _tray.DoubleClick += (_, _) => Dispatcher.Invoke(ShowApp);
         SourceInitialized += (_, _) =>
         {
-            _hotkey = new HotkeyService(this, () => _ = BeginCaptureAsync());
+            _hotkey = new HotkeyService(this, () => _ = BeginCaptureAsync(chooseMode: _shortcut.IsPrintScreen));
             if (!_hotkey.Register(_shortcut)) SetStatus(_shortcut.IsPrintScreen
                 ? "Print Screen is unavailable. Turn off Windows' Print Screen screen-capture setting, then select Use Print Screen again."
                 : "The capture shortcut is already in use. Click the shortcut button to choose another.");
@@ -165,16 +164,36 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task BeginCaptureAsync()
+    private async Task BeginCaptureAsync(bool chooseMode = false)
     {
         if (_busy || _exiting || _choosingShortcut) return;
         var mode = (CaptureMode)CaptureModeBox.SelectedIndex;
-        await RunOperation(async _ =>
+        await RunOperation(async token =>
         {
+            bool restoreWindow = IsVisible || !chooseMode;
             Hide();
-            BitmapSource? bitmap;
-            try { await Task.Delay(200); bitmap = await CaptureService.CaptureAsync(mode); }
-            finally { ShowApp(); }
+            BitmapSource? bitmap = null;
+            try
+            {
+                if (chooseMode)
+                {
+                    var chooser = new CaptureModeWindow();
+                    using var cancelChooser = token.Register(() => Dispatcher.BeginInvoke(new Action(() => { if (chooser.IsVisible) chooser.Close(); })));
+                    if (chooser.ShowDialog() != true || chooser.SelectedMode is not { } selected)
+                    {
+                        SetStatus("Capture cancelled. Nothing was saved.");
+                        return;
+                    }
+                    mode = selected;
+                    CaptureModeBox.SelectedIndex = (int)mode;
+                }
+                // Let the chooser and main window disappear before taking the snapshot.
+                await Task.Delay(200, token);
+                bitmap = await CaptureService.CaptureAsync(mode);
+                if (bitmap is not null) restoreWindow = true;
+            }
+            catch { restoreWindow = true; throw; }
+            finally { if (restoreWindow) ShowApp(); }
             if (bitmap is null) { SetStatus("Capture cancelled. Nothing was saved."); return; }
             var entry = new CaptureEntry(bitmap, mode == CaptureMode.Display ? "Display" : mode.ToString(), DateTime.Now);
             int removed = _history.Add(entry);
