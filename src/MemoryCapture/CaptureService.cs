@@ -66,6 +66,7 @@ internal sealed class CaptureOverlay : Forms.Form
     private readonly bool _chooseMode;
     private bool _awaitingMode;
     private CaptureModeWindow? _chooser;
+    private readonly Forms.Button? _changeModeButton;
     public CaptureMode SelectedMode => _mode;
     public Exception? Error { get; private set; }
     private readonly Drawing.Rectangle _desktop;
@@ -117,6 +118,20 @@ internal sealed class CaptureOverlay : Forms.Form
         KeyPreview = true;
         Cursor = chooseMode ? Forms.Cursors.Default : Forms.Cursors.Cross;
         Text = App.DisplayName + " - Capture selection";
+        if (chooseMode)
+        {
+            _changeModeButton = new Forms.Button
+            {
+                Name = "ChangeModeButton", Text = "Change mode (Backspace)",
+                AccessibleName = "Change capture mode", Size = new Drawing.Size(230, 34),
+                BackColor = Drawing.Color.FromArgb(54, 69, 99), ForeColor = Drawing.Color.White,
+                FlatStyle = Forms.FlatStyle.Flat, Cursor = Forms.Cursors.Hand, Visible = false,
+                Font = new Drawing.Font("Segoe UI", 10), UseVisualStyleBackColor = false
+            };
+            _changeModeButton.FlatAppearance.BorderColor = Drawing.Color.FromArgb(129, 140, 248);
+            _changeModeButton.Click += (_, _) => RequestModeChange();
+            Controls.Add(_changeModeButton);
+        }
     }
 
     protected override void OnShown(EventArgs e)
@@ -136,21 +151,55 @@ internal sealed class CaptureOverlay : Forms.Form
 
     private void ChooseMode()
     {
-        if (IsDisposed || !Visible) return;
+        if (IsDisposed || !Visible || _chooser is not null) return;
         try
         {
             _chooser = new CaptureModeWindow();
             new WindowInteropHelper(_chooser).Owner = Handle;
             if (_chooser.ShowDialog() != true || _chooser.SelectedMode is not { } selected)
             { DialogResult = Forms.DialogResult.Cancel; return; }
-            _mode = selected;
             _awaitingMode = false;
-            Cursor = Forms.Cursors.Cross;
             Activate();
-            UpdateSelection(Pointer);
+            SetMode(selected);
         }
         catch (Exception ex) { Error = ex; DialogResult = Forms.DialogResult.Cancel; }
         finally { _chooser = null; }
+    }
+
+    private void ResetSelection()
+    {
+        _dragging = false;
+        Capture = false;
+        _selection = Drawing.Rectangle.Empty;
+        SelectedWindow = 0;
+    }
+
+    private void SetMode(CaptureMode mode)
+    {
+        ResetSelection();
+        _mode = mode;
+        Cursor = Forms.Cursors.Cross;
+        UpdateSelection(Pointer);
+    }
+
+    private void RequestModeChange()
+    {
+        if (!_chooseMode || _awaitingMode || _chooser is not null) return;
+        ResetSelection();
+        _awaitingMode = true;
+        Cursor = Forms.Cursors.Default;
+        UpdateModeButton();
+        Refresh();
+        // Queue after the current mouse/key event so it cannot also select a capture.
+        BeginInvoke(new Action(ChooseMode));
+    }
+
+    private void UpdateModeButton()
+    {
+        if (_changeModeButton is null) return;
+        var screen = Forms.Screen.FromPoint(Forms.Cursor.Position).Bounds;
+        _changeModeButton.Location = new Drawing.Point(screen.Left - _desktop.Left + 36, screen.Top - _desktop.Top + 86);
+        _changeModeButton.Visible = !_awaitingMode && !_dragging;
     }
 
     protected override void OnFormClosing(Forms.FormClosingEventArgs e)
@@ -166,12 +215,13 @@ internal sealed class CaptureOverlay : Forms.Form
         if (e.Button == Forms.MouseButtons.Right) { DialogResult = Forms.DialogResult.Cancel; return; }
         if (_awaitingMode || e.Button != Forms.MouseButtons.Left) return;
         UpdateSelection(e.Location);
-        if (_mode == CaptureMode.Region) { _anchor = e.Location; _dragging = true; Capture = true; }
+        if (_mode == CaptureMode.Region) { _anchor = e.Location; _dragging = true; Capture = true; UpdateModeButton(); }
         else Finish();
     }
     protected override void OnMouseMove(Forms.MouseEventArgs e) { base.OnMouseMove(e); UpdateSelection(e.Location); }
     private void UpdateSelection(Drawing.Point position)
     {
+        UpdateModeButton();
         if (_awaitingMode) { Invalidate(); return; }
         var screenPosition = new Drawing.Point(position.X + _desktop.X, position.Y + _desktop.Y);
         if (_mode == CaptureMode.Region && _dragging)
@@ -195,7 +245,7 @@ internal sealed class CaptureOverlay : Forms.Form
     {
         base.OnMouseUp(e);
         if (_mode == CaptureMode.Region && _dragging && e.Button == Forms.MouseButtons.Left)
-        { UpdateSelection(e.Location); _dragging = false; Capture = false; Finish(); }
+        { UpdateSelection(e.Location); _dragging = false; Capture = false; UpdateModeButton(); Finish(); }
     }
     private void Finish()
     {
@@ -208,7 +258,32 @@ internal sealed class CaptureOverlay : Forms.Form
         DialogResult = Forms.DialogResult.OK;
     }
     protected override void OnKeyDown(Forms.KeyEventArgs e)
-    { if (e.KeyCode == Forms.Keys.Escape) DialogResult = Forms.DialogResult.Cancel; base.OnKeyDown(e); }
+    {
+        if (e.KeyCode == Forms.Keys.Escape)
+        {
+            e.Handled = e.SuppressKeyPress = true;
+            DialogResult = Forms.DialogResult.Cancel;
+        }
+        else if (_chooseMode && !_awaitingMode && e.Modifiers == Forms.Keys.None)
+        {
+            CaptureMode? mode = e.KeyCode switch
+            {
+                Forms.Keys.R => CaptureMode.Region, Forms.Keys.W => CaptureMode.Window,
+                Forms.Keys.F => CaptureMode.Display, _ => null
+            };
+            if (mode is { } selected)
+            {
+                e.Handled = e.SuppressKeyPress = true;
+                SetMode(selected);
+            }
+            else if (e.KeyCode == Forms.Keys.Back)
+            {
+                e.Handled = e.SuppressKeyPress = true;
+                RequestModeChange();
+            }
+        }
+        base.OnKeyDown(e);
+    }
     protected override void OnPaint(Forms.PaintEventArgs e)
     {
         e.Graphics.DrawImageUnscaled(_snapshot, 0, 0);
@@ -226,10 +301,15 @@ internal sealed class CaptureOverlay : Forms.Form
         var hint = _mode switch { CaptureMode.Region => "Drag to capture a region", CaptureMode.Window => "Click a window to capture", _ => "Click a display to capture" };
         using var font = new Drawing.Font("Segoe UI", 12);
         using var background = new Drawing.SolidBrush(Drawing.Color.FromArgb(245, 23, 36, 58));
-        e.Graphics.FillRectangle(background, left, top, 440, 52);
-        e.Graphics.DrawString(hint + "   ·   Esc to cancel", font, Drawing.Brushes.White, left + 16, top + 15);
+        e.Graphics.FillRectangle(background, left, top, _chooseMode ? 520 : 440, _chooseMode ? 108 : 52);
+        e.Graphics.DrawString(hint + "   |   Esc to cancel", font, Drawing.Brushes.White, left + 16, top + 12);
+        if (_chooseMode)
+        {
+            using var shortcutFont = new Drawing.Font("Segoe UI", 10);
+            e.Graphics.DrawString("R: Region    W: Window    F: Full screen", shortcutFont, Drawing.Brushes.White, left + 16, top + 38);
+        }
     }
-    protected override void Dispose(bool disposing) { if (disposing) _snapshot.Dispose(); base.Dispose(disposing); }
+    protected override void Dispose(bool disposing) { if (disposing) { _snapshot.Dispose(); _changeModeButton?.Font.Dispose(); } base.Dispose(disposing); }
 }
 
 internal static class Native

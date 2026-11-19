@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.5.0 — 2026-11-18
+
+- Added **Change mode (Backspace)** to the frozen Print Screen overlay so you can reopen the chooser before completing a capture.
+- Added **R**, **W**, and **F** shortcuts to switch modes directly during selection.
+- Changing modes clears unfinished selections and preserves the original frozen frame. Repeated Backspace presses open only one chooser.
+- Added on-screen instructions and integration checks for mode changes, interrupted drags, cancellation, and unchanged frozen pixels.
+
+Save any captures you need, then use **Exit and discard captures** in the tray menu before opening 1.5.0. Re-enable **Start with Windows** in the new copy if needed.
+
 ## 1.4.1 — 2026-11-18
 
 - The main window's **Exit** button now hides the app in the system tray, like the window's **X** button.

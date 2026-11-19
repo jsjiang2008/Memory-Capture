@@ -4,7 +4,7 @@ A portable Windows 11 screenshot tool and local image converter. Captures stay i
 
 ## Run
 
-Extract **MemoryCapture-1.4.1-win-x64.zip** into a folder and open **MemoryCapture.exe**. Keep the executable, DLLs, and `policy.xml` together. The portable package includes .NET and the image codecs; no installer, administrator access, or Microsoft Store HEIC extension is required.
+Extract **MemoryCapture-1.5.0-win-x64.zip** into a folder and open **MemoryCapture.exe**. Keep the executable, DLLs, and `policy.xml` together. The portable package includes .NET and the image codecs; no installer, administrator access, or Microsoft Store HEIC extension is required.
 
 If another copy is running, open it from the system tray. Save or copy anything you need, then right-click the tray icon and choose **Exit and discard captures** before opening the new version. The main window's **Exit** button only hides the app.
 
@@ -23,6 +23,8 @@ Memory Capture supports **PrtSc / Print Screen** as a standalone capture shortcu
 1. Open **Windows Settings**, search for **Print Screen**, and turn off **Use the Print Screen key to open screen capture/snipping**. The wording may vary by Windows version. See [Microsoft's keyboard shortcut instructions](https://support.microsoft.com/en-gb/accessibility/windows/keyboard-shortcuts-in-windows).
 2. In Memory Capture, click the shortcut button at the top (initially **Ctrl + Shift + S**), then click **Use Print Screen**. You can also press PrtSc in the shortcut dialog and click **Use shortcut**.
 3. Keep Memory Capture running in the system tray. Press **PrtSc** to freeze the screen and open the capture chooser over that frozen image. Select **Region (drag)**, **Window**, or **Full screen**, then drag an area or click a window/display. You can also press **R**, **W**, or **F** in the chooser; **Escape** cancels. Nothing is automatically copied or saved; use **Copy** or **Save** when ready.
+
+Before completing a Print Screen capture, click **Change mode (Backspace)** on the frozen screen or press **Backspace** to reopen the chooser. You can also press **R**, **W**, or **F** to switch directly to Region, Window, or Full screen. Switching clears any unfinished drag and keeps the same frozen image. **Escape** still cancels the entire capture.
 
 All three Print Screen modes use the same frozen frame, so content does not advance while you choose. The chooser and selection overlay are excluded from the resulting screenshot. **Window** crops the selected window's visible screen area; overlapping windows remain visible in that crop. For a live capture of the window itself, select **Window** in the main app and use **New capture**.
 
@@ -65,11 +67,11 @@ Requires Windows and the .NET 10 SDK. From PowerShell in this folder:
 .\build.ps1 -Test -Package
 ```
 
-The versioned ZIP and unpacked portable app are created in `dist` (for example, `MemoryCapture-1.4.1-win-x64`). Build caches stay in `.build` and `.packages`. The image library is pinned to Magick.NET-Q8-x64 15.1.0.
+The versioned ZIP and unpacked portable app are created in `dist` (for example, `MemoryCapture-1.5.0-win-x64`). Build caches stay in `.build` and `.packages`. The image library is pinned to Magick.NET-Q8-x64 15.1.0.
 
 `-HotkeyTest` checks actual Windows shortcut registration, conflicts, switching, and cleanup using hidden test windows. It briefly claims Print Screen if available, then releases it without changing Windows settings.
 
-`-ChooserTest` checks chooser buttons, keyboard selection, cancellation, reopening, and the frozen-screen flow for all three modes. It temporarily displays a generated image as the frozen overlay and verifies the captured pixels and dimensions; it does not read or save your real desktop.
+`-ChooserTest` checks chooser buttons, keyboard selection, cancellation, reopening, and the frozen-screen flow for all three modes, including reopening the chooser, repeated mode switches, and switching during a drag. It temporarily displays a generated image as the frozen overlay and verifies the captured pixels and dimensions; it does not read or save your real desktop.
 
 `-StartupTest` checks startup registration in an isolated temporary registry key, path validation, enable/disable, upgrades, and hidden-window shortcut registration. It does not enable startup for your account. It briefly opens a test window.
 
