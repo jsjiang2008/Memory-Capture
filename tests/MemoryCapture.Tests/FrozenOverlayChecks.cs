@@ -16,9 +16,17 @@ internal static class FrozenOverlayChecks
         RunCapture(CaptureMode.Region, true, check);
         RunSwitching(false, check);
         RunSwitching(true, check);
+        RunCapture(CaptureMode.Region, false, check, mainMenu: true);
+        foreach (var mode in Enum.GetValues<CaptureMode>())
+        {
+            RunMainMenu(mode, true, false, check);
+            RunMainMenu(mode, false, true, check);
+        }
+        RunMainMenu(CaptureMode.Region, true, true, check);
+        RunMainMenu(CaptureMode.Display, false, false, check);
     }
 
-    private static void RunCapture(CaptureMode mode, bool cancel, Action<bool, string> check)
+    private static void RunCapture(CaptureMode mode, bool cancel, Action<bool, string> check, bool mainMenu = false)
     {
         var screen = Forms.Screen.PrimaryScreen!.Bounds;
         var window = new Drawing.Rectangle(screen.X + screen.Width / 2 - 160, screen.Y + screen.Height / 2 - 120, 320, 240);
@@ -43,8 +51,8 @@ internal static class FrozenOverlayChecks
                     var pixel = rendered.GetPixel(20, 20);
                     check(pixel.B > pixel.R && pixel.B < 192, "frozen frame is painted and dimmed underneath the chooser");
                     choseMode = true;
-                    var buttons = ((StackPanel)chooser.Content).Children.OfType<Button>();
-                    var button = cancel ? buttons.Single(b => b.IsCancel) : buttons.Single(b => Equals(b.Tag, mode));
+                    var buttons = ChooserChecks.Buttons(chooser);
+                    var button = mainMenu ? buttons.Single(b => b.Name == "MainMenuButton") : cancel ? buttons.Single(b => b.IsCancel) : buttons.Single(b => Equals(b.Tag, mode));
                     button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 }
                 else if (choseMode && chooser is null && overlay.Enabled && !cancel)
@@ -73,9 +81,14 @@ internal static class FrozenOverlayChecks
         timer.Stop();
         if (failure is not null) throw failure;
         if (overlay.Error is not null) throw overlay.Error;
+        if (mainMenu)
+        {
+            check(overlay.OpenMainMenu && result != Forms.DialogResult.OK && overlay.Result is null, "chooser Main menu request reaches the overlay without creating an image");
+            return;
+        }
         if (cancel)
         {
-            check(result != Forms.DialogResult.OK && overlay.Result is null, "cancelling the chooser dismisses the frozen overlay without a capture");
+            check(result != Forms.DialogResult.OK && overlay.Result is null && !overlay.OpenMainMenu, "cancelling the chooser dismisses the frozen overlay without a capture");
             return;
         }
         check(result == Forms.DialogResult.OK && overlay.Result is not null, mode + " returns a frozen image");
@@ -116,7 +129,7 @@ internal static class FrozenOverlayChecks
                     {
                         check(overlay.Visible && new WindowInteropHelper(chooser).Owner == overlay.Handle, "Change mode button reopens the chooser over the same overlay");
                         stage = 5;
-                        if (cancel) ((StackPanel)chooser.Content).Children.OfType<Button>().Single(b => b.IsCancel).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        if (cancel) ChooserChecks.Buttons(chooser).Single(b => b.IsCancel).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                         else Choose(chooser, CaptureMode.Display);
                     }
                     return;
@@ -190,8 +203,57 @@ internal static class FrozenOverlayChecks
         check(pixels[0] == 192 && pixels[1] == 96 && pixels[2] == 32, "mode changes preserve the original frozen frame and exclude the new button");
     }
 
+    private static void RunMainMenu(CaptureMode mode, bool chooseMode, bool keyboard, Action<bool, string> check)
+    {
+        var screen = Forms.Screen.PrimaryScreen!.Bounds;
+        var snapshot = new Drawing.Bitmap(screen.Width, screen.Height);
+        using (var graphics = Drawing.Graphics.FromImage(snapshot)) graphics.Clear(Drawing.Color.FromArgb(32, 96, 192));
+        using var overlay = new CaptureOverlay(mode, chooseMode, screen, snapshot, Array.Empty<(nint, Drawing.Rectangle)>());
+        Exception? failure = null;
+        bool ready = !chooseMode;
+        int ticks = 0;
+        using var timer = new Forms.Timer { Interval = 50 };
+        timer.Tick += (_, _) =>
+        {
+            try
+            {
+                if (++ticks > 100) throw new Exception("Main menu navigation did not finish within five seconds.");
+                var chooser = Application.Current.Windows.OfType<CaptureModeWindow>().FirstOrDefault(w => w.IsVisible);
+                if (!ready && chooser is not null) { ready = true; Choose(chooser, mode); return; }
+                if (!ready || chooser is not null || !overlay.Enabled) return;
+                var button = overlay.Controls.Find("MainMenuButton", false).OfType<Forms.Button>().Single();
+                check(button.Visible, "Main menu is visible in " + mode + (chooseMode ? " from Print Screen" : " from direct capture"));
+                if (keyboard)
+                {
+                    if (mode == CaptureMode.Region)
+                    {
+                        Mouse(overlay, "OnMouseDown", Forms.MouseButtons.Left, 200, 200);
+                        Mouse(overlay, "OnMouseMove", Forms.MouseButtons.Left, 250, 250);
+                    }
+                    Key(overlay, Forms.Keys.M);
+                }
+                else button.PerformClick();
+                timer.Stop();
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+                timer.Stop();
+                foreach (var chooser in Application.Current.Windows.OfType<CaptureModeWindow>().ToArray()) chooser.Close();
+                overlay.Close();
+            }
+        };
+        overlay.Shown += (_, _) => timer.Start();
+        var result = overlay.ShowDialog();
+        timer.Stop();
+        if (failure is not null) throw failure;
+        if (overlay.Error is not null) throw overlay.Error;
+        check(overlay.OpenMainMenu && overlay.Result is null && result != Forms.DialogResult.OK && !overlay.Capture,
+            (keyboard ? "M" : "Main menu button") + " exits " + mode + " selection without taking a screenshot");
+    }
+
     private static void Choose(CaptureModeWindow chooser, CaptureMode mode) =>
-        ((StackPanel)chooser.Content).Children.OfType<Button>().Single(b => Equals(b.Tag, mode)).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        ChooserChecks.Buttons(chooser).Single(b => Equals(b.Tag, mode)).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
 
     private static void Key(CaptureOverlay overlay, Forms.Keys key) =>
         typeof(CaptureOverlay).GetMethod("OnKeyDown", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(overlay, [new Forms.KeyEventArgs(key)]);

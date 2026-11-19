@@ -4,7 +4,7 @@ A portable Windows 11 screenshot tool and local image converter. Captures stay i
 
 ## Run
 
-Extract **MemoryCapture-1.5.0-win-x64.zip** into a folder and open **MemoryCapture.exe**. Keep the executable, DLLs, and `policy.xml` together. The portable package includes .NET and the image codecs; no installer, administrator access, or Microsoft Store HEIC extension is required.
+Extract **MemoryCapture-1.6.0-win-x64.zip** into a folder and open **MemoryCapture.exe**. Keep the executable, DLLs, and `policy.xml` together. The portable package includes .NET and the image codecs; no installer, administrator access, or Microsoft Store HEIC extension is required.
 
 If another copy is running, open it from the system tray. Save or copy anything you need, then right-click the tray icon and choose **Exit and discard captures** before opening the new version. The main window's **Exit** button only hides the app.
 
@@ -13,6 +13,8 @@ If another copy is running, open it from the system tray. Save or copy anything 
 1. Choose **Region**, **Window**, or **Full display**, then click **New capture**. The configurable **Ctrl + Shift + S** shortcut uses the selected mode.
 2. Drag a rectangle, click a window, or click a display. **Escape** or right-click cancels.
 3. Use **Copy** to paste the image elsewhere, or **Save as…** to create a PNG, JPG, or WebP file.
+
+To leave screenshot mode and open the app, click **Main menu (M)** or press **M**. This is available in the mode chooser and during Region, Window, or Full screen selection, including captures started from the tray. It discards the unfinished selection without creating an image and preserves your existing captures and conversion queue. **Escape** keeps its existing cancel behavior; a Print Screen capture started from the tray returns to the tray.
 
 The history holds up to **20 captures or 256 MB**, evicting the oldest entries at the limit. **Delete** and **Clear all** remove temporary captures. Clicking **Exit** in the main window or closing it with **X** keeps the app running in the tray, preserving temporary captures, the conversion queue, and the capture shortcut. Double-click the tray icon to reopen it. To fully quit and discard the temporary history, right-click the tray icon and choose **Exit and discard captures**. Saved files and copied clipboard images remain independent of the history.
 
@@ -67,11 +69,11 @@ Requires Windows and the .NET 10 SDK. From PowerShell in this folder:
 .\build.ps1 -Test -Package
 ```
 
-The versioned ZIP and unpacked portable app are created in `dist` (for example, `MemoryCapture-1.5.0-win-x64`). Build caches stay in `.build` and `.packages`. The image library is pinned to Magick.NET-Q8-x64 15.1.0.
+The versioned ZIP and unpacked portable app are created in `dist` (for example, `MemoryCapture-1.6.0-win-x64`). Build caches stay in `.build` and `.packages`. The image library is pinned to Magick.NET-Q8-x64 15.1.0.
 
 `-HotkeyTest` checks actual Windows shortcut registration, conflicts, switching, and cleanup using hidden test windows. It briefly claims Print Screen if available, then releases it without changing Windows settings.
 
-`-ChooserTest` checks chooser buttons, keyboard selection, cancellation, reopening, and the frozen-screen flow for all three modes, including reopening the chooser, repeated mode switches, and switching during a drag. It temporarily displays a generated image as the frozen overlay and verifies the captured pixels and dimensions; it does not read or save your real desktop.
+`-ChooserTest` checks chooser buttons, keyboard selection, cancellation, reopening, and the frozen-screen flow for all three modes, including reopening the chooser, repeated mode switches, switching during a drag, and returning to the main menu from the chooser or any capture mode. It temporarily displays a generated image as the frozen overlay and verifies the captured pixels and dimensions; it does not read or save your real desktop.
 
 `-StartupTest` checks startup registration in an isolated temporary registry key, path validation, enable/disable, upgrades, and hidden-window shortcut registration. It does not enable startup for your account. It briefly opens a test window.
 

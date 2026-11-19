@@ -171,6 +171,7 @@ public partial class MainWindow : Window
         await RunOperation(async token =>
         {
             bool restoreWindow = IsVisible || !chooseMode;
+            bool openMainMenu = false;
             Hide();
             BitmapSource? bitmap = null;
             try
@@ -179,7 +180,12 @@ public partial class MainWindow : Window
                 // the mode chooser and keeps the same frame until selection finishes.
                 await Task.Delay(200, token);
                 var capture = await CaptureService.CaptureAsync(mode, chooseMode);
-                if (capture is not null)
+                if (capture?.OpenMainMenu == true)
+                {
+                    openMainMenu = restoreWindow = true;
+                    Tabs.SelectedIndex = 0;
+                }
+                else if (capture is not null)
                 {
                     bitmap = capture.Image;
                     mode = capture.Mode;
@@ -189,7 +195,11 @@ public partial class MainWindow : Window
             }
             catch { restoreWindow = true; throw; }
             finally { if (restoreWindow) ShowApp(); }
-            if (bitmap is null) { SetStatus("Capture cancelled. Nothing was saved."); return; }
+            if (bitmap is null)
+            {
+                SetStatus(openMainMenu ? "Returned to the main menu. Your existing captures are still available." : "Capture cancelled. Nothing was saved.");
+                return;
+            }
             var entry = new CaptureEntry(bitmap, mode == CaptureMode.Display ? "Display" : mode.ToString(), DateTime.Now);
             int removed = _history.Add(entry);
             Tabs.SelectedIndex = 0;

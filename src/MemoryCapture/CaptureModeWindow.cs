@@ -5,6 +5,7 @@ namespace MemoryCapture;
 public sealed class CaptureModeWindow : Window
 {
     public CaptureMode? SelectedMode { get; private set; }
+    public bool OpenMainMenu { get; private set; }
 
     public CaptureModeWindow()
     {
@@ -23,13 +24,19 @@ public sealed class CaptureModeWindow : Window
         AddMode(panel, CaptureMode.Display, "Full screen", "Click the display you want to capture.", "F");
         var cancel = new Button { Content = "Cancel (Esc)", IsCancel = true, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 8, 0, 0) };
         cancel.Click += (_, _) => DialogResult = false;
-        panel.Children.Add(cancel);
+        var mainMenu = new Button { Name = "MainMenuButton", Content = "Main menu (M)", Margin = new Thickness(0, 8, 8, 0) };
+        mainMenu.Click += (_, _) => ReturnToMainMenu();
+        var footer = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        footer.Children.Add(mainMenu);
+        footer.Children.Add(cancel);
+        panel.Children.Add(footer);
         Content = panel;
         PreviewKeyDown += (_, e) =>
         {
             if (Keyboard.Modifiers != ModifierKeys.None) return;
             CaptureMode? mode = e.Key switch { Key.R => CaptureMode.Region, Key.W => CaptureMode.Window, Key.F => CaptureMode.Display, _ => null };
             if (mode is { } selected) { e.Handled = true; Choose(selected); }
+            else if (e.Key == Key.M) { e.Handled = true; ReturnToMainMenu(); }
             else if (e.Key == Key.Escape) { e.Handled = true; DialogResult = false; }
         };
     }
@@ -43,6 +50,12 @@ public sealed class CaptureModeWindow : Window
         button.Click += (_, _) => Choose(mode);
         panel.Children.Add(button);
         if (mode == CaptureMode.Region) Loaded += (_, _) => button.Focus();
+    }
+
+    private void ReturnToMainMenu()
+    {
+        OpenMainMenu = true;
+        DialogResult = false;
     }
 
     private void Choose(CaptureMode mode)

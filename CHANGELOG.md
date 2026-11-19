@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.6.0 — 2026-11-19
+
+- Added **Main menu (M)** to the screenshot mode chooser and frozen selection controls.
+- Press **M** or click the button to cancel the unfinished selection and open the app's Captures tab, including when capture started from the tray.
+- Existing captures and the conversion queue stay available. Returning to the menu does not create, copy, or save a screenshot.
+- Escape retains its normal cancellation behavior.
+- Added navigation checks for the chooser, each capture mode, and an unfinished drag.
+
+Save any captures you need, then use **Exit and discard captures** in the tray menu before opening 1.6.0. Re-enable **Start with Windows** in the new copy if needed.
+
 ## 1.5.0 — 2026-11-18
 
 - Added **Change mode (Backspace)** to the frozen Print Screen overlay so you can reopen the chooser before completing a capture.
