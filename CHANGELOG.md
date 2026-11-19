@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.4.0 — 2026-11-18
+
+- Print Screen freezes the desktop before showing the mode chooser. The chooser appears over the frozen screen.
+- Region, Window, and Full screen selections keep the original frozen pixels while you choose. The chooser and dimming are excluded from captured images.
+- Window selection from Print Screen crops the window's visible area in the frozen frame. Direct Window capture from the main app continues to use Windows Graphics Capture.
+- Cancelling the chooser dismisses the frozen overlay without creating a capture.
+- Added integration checks for frozen pixels, all three modes, capture dimensions, and cancellation.
+
+Save any captures you need and exit the older app before opening 1.4.0. If you use **Start with Windows**, enable it in the new copy to update the startup location.
+
 ## 1.3.1 — 2026-11-18
 
 - Show the app name and version in the main window, screenshot chooser, and capture shortcut dialog title bars (for example, **Memory Capture 1.3.1**).

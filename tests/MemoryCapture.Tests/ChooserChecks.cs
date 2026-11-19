@@ -47,6 +47,7 @@ internal static class ChooserChecks
             Press(chooser, Key.Escape);
         });
         check(reopened.Accepted != true && reopened.Mode is null, "reopened chooser can be cancelled");
+        FrozenOverlayChecks.Run(check);
         app.Shutdown();
     }
 

@@ -1,13 +1,14 @@
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
-using System.Text;
+using System.Windows.Interop;
 using Forms = System.Windows.Forms;
 using Drawing = System.Drawing;
 
 namespace MemoryCapture;
 
 public enum CaptureMode { Region, Window, Display }
+public sealed record CaptureResult(BitmapSource Image, CaptureMode Mode);
 
 public static class CaptureService
 {
@@ -24,16 +25,20 @@ public static class CaptureService
         }
         catch { bitmap.Dispose(); throw; }
     }
-    public static async Task<BitmapSource?> CaptureAsync(CaptureMode mode)
+    public static async Task<CaptureResult?> CaptureAsync(CaptureMode mode, bool chooseMode = false)
     {
-        using var picker = new CaptureOverlay(mode);
-        if (picker.ShowDialog() != Forms.DialogResult.OK) return null;
-        if (mode == CaptureMode.Window)
+        using var picker = new CaptureOverlay(mode, chooseMode);
+        var result = picker.ShowDialog();
+        if (picker.Error is { } error) throw new InvalidOperationException("Could not choose a capture mode.", error);
+        if (result != Forms.DialogResult.OK) return null;
+        // Print Screen uses the original frozen pixels in every mode. Direct window
+        // capture retains Windows Graphics Capture for unobscured window contents.
+        if (picker.SelectedMode == CaptureMode.Window && !chooseMode)
         {
             await Task.Delay(120);
-            return await WindowCapture.CaptureAsync(picker.SelectedWindow);
+            return new(await WindowCapture.CaptureAsync(picker.SelectedWindow), picker.SelectedMode);
         }
-        return picker.Result;
+        return picker.Result is { } image ? new(image, picker.SelectedMode) : null;
     }
 
     public static BitmapSource FromDrawingBitmap(Drawing.Bitmap bitmap)
@@ -57,7 +62,12 @@ public static class CaptureService
 
 internal sealed class CaptureOverlay : Forms.Form
 {
-    private readonly CaptureMode _mode;
+    private CaptureMode _mode;
+    private readonly bool _chooseMode;
+    private bool _awaitingMode;
+    private CaptureModeWindow? _chooser;
+    public CaptureMode SelectedMode => _mode;
+    public Exception? Error { get; private set; }
     private readonly Drawing.Rectangle _desktop;
     private readonly Drawing.Bitmap _snapshot;
     private readonly List<(nint Handle, Drawing.Rectangle Bounds)> _windows = [];
@@ -67,13 +77,20 @@ internal sealed class CaptureOverlay : Forms.Form
     public BitmapSource? Result { get; private set; }
     public nint SelectedWindow { get; private set; }
 
-    public CaptureOverlay(CaptureMode mode)
+    public CaptureOverlay(CaptureMode mode, bool chooseMode = false)
+        : this(mode, chooseMode, Forms.SystemInformation.VirtualScreen, null, null) { }
+
+    // Tests can supply a known frozen frame without reading or saving the desktop.
+    internal CaptureOverlay(CaptureMode mode, bool chooseMode, Drawing.Rectangle desktop,
+        Drawing.Bitmap? snapshot, IEnumerable<(nint Handle, Drawing.Rectangle Bounds)>? windows)
     {
         _mode = mode;
-        _desktop = Forms.SystemInformation.VirtualScreen;
+        _chooseMode = _awaitingMode = chooseMode;
+        _desktop = desktop;
         if ((long)_desktop.Width * _desktop.Height * 4 > 256L * 1024 * 1024)
             throw new InvalidOperationException("The combined displays exceed the capture memory limit.");
-        if (mode == CaptureMode.Window)
+        if (windows is not null) _windows.AddRange(windows);
+        else if (mode == CaptureMode.Window || chooseMode)
         {
             Native.EnumWindows((handle, _) =>
             {
@@ -89,7 +106,7 @@ internal sealed class CaptureOverlay : Forms.Form
                 return true;
             }, 0);
         }
-        _snapshot = CaptureService.CaptureDesktopSnapshot(_desktop);
+        _snapshot = snapshot ?? CaptureService.CaptureDesktopSnapshot(_desktop);
         FormBorderStyle = Forms.FormBorderStyle.None;
         StartPosition = Forms.FormStartPosition.Manual;
         AutoScaleMode = Forms.AutoScaleMode.None;
@@ -98,8 +115,8 @@ internal sealed class CaptureOverlay : Forms.Form
         ShowInTaskbar = false;
         DoubleBuffered = true;
         KeyPreview = true;
-        Cursor = Forms.Cursors.Cross;
-        Text = "Memory Capture selection";
+        Cursor = chooseMode ? Forms.Cursors.Default : Forms.Cursors.Cross;
+        Text = App.DisplayName + " - Capture selection";
     }
 
     protected override void OnShown(EventArgs e)
@@ -108,31 +125,65 @@ internal sealed class CaptureOverlay : Forms.Form
         // Set physical bounds after the HWND is created, avoiding WPF device-independent units.
         Native.SetWindowPos(Handle, new nint(-1), _desktop.X, _desktop.Y, _desktop.Width, _desktop.Height, 0x0040);
         Activate();
-        UpdateSelection();
+        UpdateSelection(Pointer);
+        if (_chooseMode)
+        {
+            // Paint the frozen desktop first; the owned chooser stays over this frame.
+            Refresh();
+            BeginInvoke(new Action(ChooseMode));
+        }
     }
+
+    private void ChooseMode()
+    {
+        if (IsDisposed || !Visible) return;
+        try
+        {
+            _chooser = new CaptureModeWindow();
+            new WindowInteropHelper(_chooser).Owner = Handle;
+            if (_chooser.ShowDialog() != true || _chooser.SelectedMode is not { } selected)
+            { DialogResult = Forms.DialogResult.Cancel; return; }
+            _mode = selected;
+            _awaitingMode = false;
+            Cursor = Forms.Cursors.Cross;
+            Activate();
+            UpdateSelection(Pointer);
+        }
+        catch (Exception ex) { Error = ex; DialogResult = Forms.DialogResult.Cancel; }
+        finally { _chooser = null; }
+    }
+
+    protected override void OnFormClosing(Forms.FormClosingEventArgs e)
+    {
+        _chooser?.Close();
+        base.OnFormClosing(e);
+    }
+
     private Drawing.Point Pointer => new(Forms.Cursor.Position.X - _desktop.X, Forms.Cursor.Position.Y - _desktop.Y);
     protected override void OnMouseDown(Forms.MouseEventArgs e)
     {
         base.OnMouseDown(e);
         if (e.Button == Forms.MouseButtons.Right) { DialogResult = Forms.DialogResult.Cancel; return; }
-        if (e.Button != Forms.MouseButtons.Left) return;
-        if (_mode == CaptureMode.Region) { _anchor = Pointer; _dragging = true; Capture = true; }
+        if (_awaitingMode || e.Button != Forms.MouseButtons.Left) return;
+        UpdateSelection(e.Location);
+        if (_mode == CaptureMode.Region) { _anchor = e.Location; _dragging = true; Capture = true; }
         else Finish();
     }
-    protected override void OnMouseMove(Forms.MouseEventArgs e) { base.OnMouseMove(e); UpdateSelection(); }
-    private void UpdateSelection()
+    protected override void OnMouseMove(Forms.MouseEventArgs e) { base.OnMouseMove(e); UpdateSelection(e.Location); }
+    private void UpdateSelection(Drawing.Point position)
     {
-        var position = Pointer;
+        if (_awaitingMode) { Invalidate(); return; }
+        var screenPosition = new Drawing.Point(position.X + _desktop.X, position.Y + _desktop.Y);
         if (_mode == CaptureMode.Region && _dragging)
             _selection = Drawing.Rectangle.FromLTRB(Math.Min(_anchor.X, position.X), Math.Min(_anchor.Y, position.Y), Math.Max(_anchor.X, position.X), Math.Max(_anchor.Y, position.Y));
         else if (_mode == CaptureMode.Display)
         {
-            _selection = Forms.Screen.FromPoint(Forms.Cursor.Position).Bounds;
+            _selection = Forms.Screen.FromPoint(screenPosition).Bounds;
             _selection.Offset(-_desktop.X, -_desktop.Y);
         }
         else if (_mode == CaptureMode.Window)
         {
-            var item = _windows.FirstOrDefault(x => x.Bounds.Contains(Forms.Cursor.Position));
+            var item = _windows.FirstOrDefault(x => x.Bounds.Contains(screenPosition));
             SelectedWindow = item.Handle;
             _selection = item.Bounds;
             _selection.Offset(-_desktop.X, -_desktop.Y);
@@ -144,12 +195,12 @@ internal sealed class CaptureOverlay : Forms.Form
     {
         base.OnMouseUp(e);
         if (_mode == CaptureMode.Region && _dragging && e.Button == Forms.MouseButtons.Left)
-        { UpdateSelection(); _dragging = false; Capture = false; Finish(); }
+        { UpdateSelection(e.Location); _dragging = false; Capture = false; Finish(); }
     }
     private void Finish()
     {
         if (_selection.Width < 2 || _selection.Height < 2 || (_mode == CaptureMode.Window && SelectedWindow == 0)) return;
-        if (_mode != CaptureMode.Window)
+        if (_mode != CaptureMode.Window || _chooseMode)
         {
             using var cropped = _snapshot.Clone(_selection, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
             Result = CaptureService.FromDrawingBitmap(cropped);
@@ -169,6 +220,7 @@ internal sealed class CaptureOverlay : Forms.Form
             using var pen = new Drawing.Pen(Drawing.Color.FromArgb(129, 140, 248), 2);
             e.Graphics.DrawRectangle(pen, _selection);
         }
+        if (_awaitingMode) return;
         var screen = Forms.Screen.FromPoint(Forms.Cursor.Position).Bounds;
         int left = screen.Left - _desktop.Left + 24, top = screen.Top - _desktop.Top + 24;
         var hint = _mode switch { CaptureMode.Region => "Drag to capture a region", CaptureMode.Window => "Click a window to capture", _ => "Click a display to capture" };

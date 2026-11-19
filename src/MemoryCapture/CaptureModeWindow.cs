@@ -17,7 +17,7 @@ public sealed class CaptureModeWindow : Window
         Topmost = true;
         var panel = new StackPanel { Margin = new Thickness(24) };
         panel.Children.Add(new TextBlock { Text = "What would you like to capture?", FontSize = 22, FontWeight = FontWeights.SemiBold });
-        panel.Children.Add(new TextBlock { Text = "Choose a mode, then select what to capture.", Foreground = Brushes.SlateGray, Margin = new Thickness(0, 8, 0, 18) });
+        panel.Children.Add(new TextBlock { Text = "Screen frozen. Choose a mode, then select what to capture.", Foreground = Brushes.SlateGray, Margin = new Thickness(0, 8, 0, 18) });
         AddMode(panel, CaptureMode.Region, "Region (drag)", "Drag a rectangle around an area.", "R");
         AddMode(panel, CaptureMode.Window, "Window", "Click an application window.", "W");
         AddMode(panel, CaptureMode.Display, "Full screen", "Click the display you want to capture.", "F");

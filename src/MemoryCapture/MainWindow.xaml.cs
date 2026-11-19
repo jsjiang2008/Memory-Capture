@@ -175,21 +175,16 @@ public partial class MainWindow : Window
             BitmapSource? bitmap = null;
             try
             {
-                if (chooseMode)
+                // Hide the main window before freezing the screen. The overlay owns
+                // the mode chooser and keeps the same frame until selection finishes.
+                await Task.Delay(200, token);
+                var capture = await CaptureService.CaptureAsync(mode, chooseMode);
+                if (capture is not null)
                 {
-                    var chooser = new CaptureModeWindow();
-                    using var cancelChooser = token.Register(() => Dispatcher.BeginInvoke(new Action(() => { if (chooser.IsVisible) chooser.Close(); })));
-                    if (chooser.ShowDialog() != true || chooser.SelectedMode is not { } selected)
-                    {
-                        SetStatus("Capture cancelled. Nothing was saved.");
-                        return;
-                    }
-                    mode = selected;
+                    bitmap = capture.Image;
+                    mode = capture.Mode;
                     CaptureModeBox.SelectedIndex = (int)mode;
                 }
-                // Let the chooser and main window disappear before taking the snapshot.
-                await Task.Delay(200, token);
-                bitmap = await CaptureService.CaptureAsync(mode);
                 if (bitmap is not null) restoreWindow = true;
             }
             catch { restoreWindow = true; throw; }

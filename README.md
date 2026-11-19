@@ -4,7 +4,7 @@ A portable Windows 11 screenshot tool and local image converter. Captures stay i
 
 ## Run
 
-Extract **MemoryCapture-1.3.1-win-x64.zip** into a folder and open **MemoryCapture.exe**. Keep the executable, DLLs, and `policy.xml` together. The portable package includes .NET and the image codecs; no installer, administrator access, or Microsoft Store HEIC extension is required.
+Extract **MemoryCapture-1.4.0-win-x64.zip** into a folder and open **MemoryCapture.exe**. Keep the executable, DLLs, and `policy.xml` together. The portable package includes .NET and the image codecs; no installer, administrator access, or Microsoft Store HEIC extension is required.
 
 If another copy is running, open it from the system tray. Save or copy anything you need before choosing **Exit**, then open the new version.
 
@@ -22,7 +22,9 @@ Memory Capture supports **PrtSc / Print Screen** as a standalone capture shortcu
 
 1. Open **Windows Settings**, search for **Print Screen**, and turn off **Use the Print Screen key to open screen capture/snipping**. The wording may vary by Windows version. See [Microsoft's keyboard shortcut instructions](https://support.microsoft.com/en-gb/accessibility/windows/keyboard-shortcuts-in-windows).
 2. In Memory Capture, click the shortcut button at the top (initially **Ctrl + Shift + S**), then click **Use Print Screen**. You can also press PrtSc in the shortcut dialog and click **Use shortcut**.
-3. Keep Memory Capture running in the system tray. Press **PrtSc** to open the capture chooser. Select **Region (drag)**, **Window**, or **Full screen**, then drag an area or click a window/display. You can also press **R**, **W**, or **F** in the chooser; **Escape** cancels. Nothing is automatically copied or saved; use **Copy** or **Save** when ready.
+3. Keep Memory Capture running in the system tray. Press **PrtSc** to freeze the screen and open the capture chooser over that frozen image. Select **Region (drag)**, **Window**, or **Full screen**, then drag an area or click a window/display. You can also press **R**, **W**, or **F** in the chooser; **Escape** cancels. Nothing is automatically copied or saved; use **Copy** or **Save** when ready.
+
+All three Print Screen modes use the same frozen frame, so content does not advance while you choose. The chooser and selection overlay are excluded from the resulting screenshot. **Window** crops the selected window's visible screen area; overlapping windows remain visible in that crop. For a live capture of the window itself, select **Window** in the main app and use **New capture**.
 
 Your shortcut choice is remembered across launches. Print Screen asks for the capture type each time. **New capture**, the tray capture command, and other configured shortcuts continue to use the mode selected in the main window. Cancelling the chooser or selection while the app is in the tray leaves it there. Closing the app window keeps its shortcut active in the tray; choosing **Exit** stops it. On some laptops, you may need **Fn + PrtSc** to send Print Screen.
 
@@ -63,11 +65,11 @@ Requires Windows and the .NET 10 SDK. From PowerShell in this folder:
 .\build.ps1 -Test -Package
 ```
 
-The versioned ZIP and unpacked portable app are created in `dist` (for example, `MemoryCapture-1.3.1-win-x64`). Build caches stay in `.build` and `.packages`. The image library is pinned to Magick.NET-Q8-x64 15.1.0.
+The versioned ZIP and unpacked portable app are created in `dist` (for example, `MemoryCapture-1.4.0-win-x64`). Build caches stay in `.build` and `.packages`. The image library is pinned to Magick.NET-Q8-x64 15.1.0.
 
 `-HotkeyTest` checks actual Windows shortcut registration, conflicts, switching, and cleanup using hidden test windows. It briefly claims Print Screen if available, then releases it without changing Windows settings.
 
-`-ChooserTest` checks the capture chooser buttons, keyboard selection, cancellation, and reopening using temporary test windows without taking screenshots.
+`-ChooserTest` checks chooser buttons, keyboard selection, cancellation, reopening, and the frozen-screen flow for all three modes. It temporarily displays a generated image as the frozen overlay and verifies the captured pixels and dimensions; it does not read or save your real desktop.
 
 `-StartupTest` checks startup registration in an isolated temporary registry key, path validation, enable/disable, upgrades, and hidden-window shortcut registration. It does not enable startup for your account. It briefly opens a test window.
 
@@ -77,7 +79,7 @@ The test runner generates small fixtures in `test-results/fixtures`. For real HE
 
 ## Architecture
 
-WPF provides the main interface. A physical-pixel WinForms overlay handles multi-monitor selection; GDI captures regions/displays and Windows Graphics Capture captures application windows. `CaptureHistory` owns temporary screenshots. `ImagingService` reads originals and returns memory buffers. `ClipboardService` publishes bitmap and PNG clipboard formats. `ExportService` is the only image-file writer, uses exclusive create-new semantics, and removes incomplete output on cancellation/write failure.
+WPF provides the main interface. A physical-pixel WinForms overlay handles multi-monitor selection; GDI freezes the desktop for regions/displays and every Print Screen mode; Windows Graphics Capture handles direct application-window capture. `CaptureHistory` owns temporary screenshots. `ImagingService` reads originals and returns memory buffers. `ClipboardService` publishes bitmap and PNG clipboard formats. `ExportService` is the only image-file writer, uses exclusive create-new semantics, and removes incomplete output on cancellation/write failure.
 
 ## Current limits
 
