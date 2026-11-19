@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.1 — 2026-11-18
+
+- The main window's **Exit** button now hides the app in the system tray, like the window's **X** button.
+- Temporary captures, the conversion queue, and the capture shortcut stay available while the window is hidden. Double-click the tray icon to reopen it.
+- **Exit and discard captures** in the tray menu still fully quits the app and clears temporary captures.
+- Updated the Exit tooltip, tray notification, and README to explain the two behaviors.
+
+To switch versions, save any captures you need, right-click the tray icon, and choose **Exit and discard captures** before opening 1.4.1. Re-enable **Start with Windows** in the new copy if you use it.
+
 ## 1.4.0 — 2026-11-18
 
 - Print Screen freezes the desktop before showing the mode chooser. The chooser appears over the frozen screen.

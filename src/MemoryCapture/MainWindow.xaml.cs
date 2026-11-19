@@ -93,7 +93,7 @@ public partial class MainWindow : Window
     private void ShowApp() { Show(); WindowState = WindowState.Normal; Activate(); }
     private void OnClosing(object? sender, CancelEventArgs e)
     {
-        if (!_exiting) { e.Cancel = true; Hide(); _tray.ShowBalloonTip(2500, "Memory Capture is still running", "Open it from the tray. Exit discards temporary captures.", Forms.ToolTipIcon.Info); }
+        if (!_exiting) { e.Cancel = true; Hide(); _tray.ShowBalloonTip(2500, "Memory Capture is still running", "Your captures and shortcut are still available. To quit, use Exit and discard captures in the tray menu.", Forms.ToolTipIcon.Info); }
     }
     private void RequestExit()
     {
@@ -110,7 +110,7 @@ public partial class MainWindow : Window
         Close();
         Application.Current.Shutdown();
     }
-    private void Exit_Click(object sender, RoutedEventArgs e) => RequestExit();
+    private void Exit_Click(object sender, RoutedEventArgs e) => Close();
     private void SetStatus(string message) => StatusText.Text = message;
     private ExportOptions Options => new((OutputFormat)Math.Max(0, OutputFormatBox.SelectedIndex), (int)QualitySlider.Value);
 

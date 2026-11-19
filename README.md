@@ -4,9 +4,9 @@ A portable Windows 11 screenshot tool and local image converter. Captures stay i
 
 ## Run
 
-Extract **MemoryCapture-1.4.0-win-x64.zip** into a folder and open **MemoryCapture.exe**. Keep the executable, DLLs, and `policy.xml` together. The portable package includes .NET and the image codecs; no installer, administrator access, or Microsoft Store HEIC extension is required.
+Extract **MemoryCapture-1.4.1-win-x64.zip** into a folder and open **MemoryCapture.exe**. Keep the executable, DLLs, and `policy.xml` together. The portable package includes .NET and the image codecs; no installer, administrator access, or Microsoft Store HEIC extension is required.
 
-If another copy is running, open it from the system tray. Save or copy anything you need before choosing **Exit**, then open the new version.
+If another copy is running, open it from the system tray. Save or copy anything you need, then right-click the tray icon and choose **Exit and discard captures** before opening the new version. The main window's **Exit** button only hides the app.
 
 ## Screenshots
 
@@ -14,7 +14,7 @@ If another copy is running, open it from the system tray. Save or copy anything 
 2. Drag a rectangle, click a window, or click a display. **Escape** or right-click cancels.
 3. Use **Copy** to paste the image elsewhere, or **Save as…** to create a PNG, JPG, or WebP file.
 
-The history holds up to **20 captures or 256 MB**, evicting the oldest entries at the limit. **Delete** and **Clear all** remove temporary captures. Closing the window keeps the app running in the tray; **Exit** discards the history. Saved files and copied clipboard images remain independent of the history.
+The history holds up to **20 captures or 256 MB**, evicting the oldest entries at the limit. **Delete** and **Clear all** remove temporary captures. Clicking **Exit** in the main window or closing it with **X** keeps the app running in the tray, preserving temporary captures, the conversion queue, and the capture shortcut. Double-click the tray icon to reopen it. To fully quit and discard the temporary history, right-click the tray icon and choose **Exit and discard captures**. Saved files and copied clipboard images remain independent of the history.
 
 ## Using the Print Screen key
 
@@ -26,7 +26,7 @@ Memory Capture supports **PrtSc / Print Screen** as a standalone capture shortcu
 
 All three Print Screen modes use the same frozen frame, so content does not advance while you choose. The chooser and selection overlay are excluded from the resulting screenshot. **Window** crops the selected window's visible screen area; overlapping windows remain visible in that crop. For a live capture of the window itself, select **Window** in the main app and use **New capture**.
 
-Your shortcut choice is remembered across launches. Print Screen asks for the capture type each time. **New capture**, the tray capture command, and other configured shortcuts continue to use the mode selected in the main window. Cancelling the chooser or selection while the app is in the tray leaves it there. Closing the app window keeps its shortcut active in the tray; choosing **Exit** stops it. On some laptops, you may need **Fn + PrtSc** to send Print Screen.
+Your shortcut choice is remembered across launches. Print Screen asks for the capture type each time. **New capture**, the tray capture command, and other configured shortcuts continue to use the mode selected in the main window. Cancelling the chooser or selection while the app is in the tray leaves it there. Closing the app window or clicking its **Exit** button keeps the shortcut active in the tray; **Exit and discard captures** in the tray menu stops it. On some laptops, you may need **Fn + PrtSc** to send Print Screen.
 
 If Print Screen is unavailable, disable the Windows setting and any competing screenshot app's Print Screen shortcut, then select **Use Print Screen** again. A failed change leaves the previous shortcut active. If Windows still opens its own capture tool, recheck the setting and restart Memory Capture. The app does not change Windows settings for you.
 
@@ -65,7 +65,7 @@ Requires Windows and the .NET 10 SDK. From PowerShell in this folder:
 .\build.ps1 -Test -Package
 ```
 
-The versioned ZIP and unpacked portable app are created in `dist` (for example, `MemoryCapture-1.4.0-win-x64`). Build caches stay in `.build` and `.packages`. The image library is pinned to Magick.NET-Q8-x64 15.1.0.
+The versioned ZIP and unpacked portable app are created in `dist` (for example, `MemoryCapture-1.4.1-win-x64`). Build caches stay in `.build` and `.packages`. The image library is pinned to Magick.NET-Q8-x64 15.1.0.
 
 `-HotkeyTest` checks actual Windows shortcut registration, conflicts, switching, and cleanup using hidden test windows. It briefly claims Print Screen if available, then releases it without changing Windows settings.
 
